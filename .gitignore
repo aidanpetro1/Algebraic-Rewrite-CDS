@@ -1,0 +1,16 @@
+# Generated visualizations
+out/
+
+# Julia
+Manifest.toml
+*.jl.cov
+*.jl.*.cov
+*.jl.mem
+deps/deps.jl
+.julia_history
+
+# Editor / OS
+.DS_Store
+.vscode/
+.idea/
+*.swp
