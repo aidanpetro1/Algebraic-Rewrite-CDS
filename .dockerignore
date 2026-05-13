@@ -1,0 +1,12 @@
+# Keep the Julia image small and rebuilds fast. The image only needs the
+# engine source + Project.toml/Manifest.toml — tests, UI, docs all stay out.
+.git
+.github
+ui
+docs
+test_*.jl
+*.md
+.gitignore
+.dockerignore
+Dockerfile
+railway.json

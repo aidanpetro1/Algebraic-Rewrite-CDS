@@ -2,7 +2,8 @@
 out/
 
 # Julia
-Manifest.toml
+# Manifest.toml is intentionally tracked: this repo is an application, not a
+# library, so reproducible builds (Docker / Railway) need the locked versions.
 *.jl.cov
 *.jl.*.cov
 *.jl.mem

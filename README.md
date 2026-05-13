@@ -2,40 +2,65 @@
 
 Clinical decision support expressed as **ACSet rewriting** in
 [Catlab.jl](https://github.com/AlgebraicJulia/Catlab.jl) and
-[AlgebraicRewriting.jl](https://github.com/AlgebraicJulia/AlgebraicRewriting.jl).
+[AlgebraicRewriting.jl](https://github.com/AlgebraicJulia/AlgebraicRewriting.jl),
+with **FHIR R4** as the wire format on both ends.
 
-A clinical state is an ACSet on a fixed schema (Observations, Findings,
-Assessments, Diagnoses, Problems + FHIR-style Code/Value/Status/Time). A CDS
-rule is a span `L ← K → R` of ACSets, optionally guarded by a *negative
-application condition* (NAC) and one or more attribute-value predicates. Rule
-firing is a homomorphism search for `m: L → state` followed by a DPO rewrite.
-Composition of rules is composition of spans — clinical pathways become
-morphisms in the rewriting category.
+## Concept
+
+A clinical state is an ACSet whose Obs are FHIR resource types
+(Observation, Condition, ClinicalImpression, MedicationRequest,
+Appointment, Encounter) and whose attributes are the resources' FHIR
+fields, inlined. The ACSet is structurally a FHIR Bundle in disguise: one
+row per entry, attributes for fields, Homs for References.
+
+A CDS rule is a span `L ← K → R` of ACSets, optionally guarded by one or
+more *negative application conditions* (NACs) and attribute-value
+predicates. Rule firing is a homomorphism search for `m: L → state`
+followed by a DPO rewrite. Composition of rules is composition of spans —
+clinical pathways become morphisms in the rewriting category.
+
+The matching and rewriting engine (Catlab + AlgebraicRewriting) operates
+on ACSets at runtime. FHIR is purely the on-disk / on-the-wire format; a
+parser turns FHIR Bundles into ACSets at the door, a serializer turns
+them back on the way out. With the FHIR-shaped schema, that round-trip
+is byte-equal — every FHIR field has exactly one ACSet attribute slot.
+
+For the longer design discussion (rules-as-FHIR-Bundles, FHIRPath
+predicates, Provenance emission) see
+[`docs/fhir_pipeline_design.md`](docs/fhir_pipeline_design.md).
+
+## Install
+
+```bash
+julia --project=. -e 'using Pkg; Pkg.instantiate()'
+cd ui && npm ci
+```
 
 ## Run
 
+Local dev needs two processes — the Julia engine and the Vite UI:
+
 ```bash
-julia viz_suite.jl
+# terminal 1 — engine on :8081
+julia --project=. cds_server.jl
+
+# terminal 2 — UI on :5173 (proxies /fire to the engine)
+cd ui && npm run dev
 ```
 
-This produces a narrative SVG suite under `out/suite/`:
+Open the UI, pick a sample rule (HTN, DM2, metformin, ophth referral)
+from the library, click **Run** or **Step** to fire it. NACs that block
+firing produce counterfactual diagnostics naming the specific violating
+resource.
 
-```
-01_schema.svg                     the schema as a category
-02_initial_state.svg              a patient state on that schema
-03_rule_add/{L,K,R,combined}.svg  DM2-add rule, one file per leg
-04_rule_add_predicates.svg        HbA1c ≥ 6.5
-05_rule_add_nac.svg               negative application condition
-06_step_add_ba.svg                before / after firing DM2-add
-07_rule_resolve/{L,K,R,...}.svg   DM2-resolve rule (design-only)
-08_rule_resolve_predicates.svg    HbA1c < 5.7
-09_pathway.svg                    longitudinal three-step pathway
-```
+To deploy publicly: see [`DEPLOY.md`](DEPLOY.md).
 
-The didactic renderer hides Code/Value/Status/Time bookkeeping and suppresses
-AttrVars from labels, so the difference between L, K, and R reads off as
-*which information appears in which leg*. Predicates fold into the L pattern
-inline (e.g. `Obs 1: HbA1c [< 5.7]`).
+## End-to-end tests
+
+```bash
+julia --project=. test_htn_nac.jl         # HTN/DM2 NAC blocking
+julia --project=. test_new_resources.jl   # MedicationRequest, Appointment, cross-resource refs
+```
 
 ## File guide
 
@@ -43,46 +68,40 @@ inline (e.g. `Obs 1: HbA1c [< 5.7]`).
 
 | File | What |
 |---|---|
-| `clinical_state_multi.jl` | The `ClinicalStateMulti` schema (`@present` + `@acset_type`). |
-| `state_builders.jl`       | Helpers for constructing instances and scenario factories. |
+| `clinical_state_multi.jl` | The `SchClinicalState` schema (`@present` + `@acset_type`). FHIR-shaped — Obs are FHIR resource types, attributes are FHIR fields. |
+| `state_builders.jl`       | `add_observation!`, `add_condition!`, … plus the cross-resource link helpers. |
 
 **Rule infrastructure**
 
 | File | What |
 |---|---|
-| `cds_rule.jl`       | `RuleWithACs` — a Catlab `Rule` plus pure-CT NACs/PACs and a `fire` driver. |
-| `cds_predicates.jl` | `AttrPredicate` and `CDSRule` — the value-level predicate layer above `RuleWithACs`. |
+| `cds_rule.jl`       | `RuleWithACs` — a Catlab `Rule` plus pure-CT NACs/PACs and a `fire` driver. `_describe_violator` produces counterfactual NAC detail. |
+| `cds_predicates.jl` | `AttrPredicate` and `CDSRule` — the value-level predicate layer. Each `AttrPredicate` translates mechanically to FHIRPath. |
 
-**Rules**
-
-| File | What |
-|---|---|
-| `rule_dm2_core.jl`         | The DM2-add rule (additive; K = L). |
-| `rule_dm2_resolve_core.jl` | The DM2-resolve rule (design-only — see header for why it can't be packaged into a runtime `Rule`). |
-
-**Visualization**
+**FHIR boundary**
 
 | File | What |
 |---|---|
-| `viz_helpers.jl` | All renderers. The `didactic_*` family is what the suite uses; the older `full_view`, `rule_view`, `before_after_view` etc. are kept for the ad-hoc demo scripts. |
-| `viz_suite.jl`   | The narrative suite — produces `out/suite/*`. |
+| `fhir_serialize.jl` | `acset_to_fhir(state) -> Bundle::Dict`. Deterministic UUIDv5 fullUrls. |
+| `fhir_parse.jl`     | `fhir_to_acset(bundle::Dict) -> CState`. Two-pass to resolve cross-resource References. |
+| `fhir_to_rule.jl`   | `fhir_to_rule(bundle::Dict) -> CDSRule`. Per-Ob builders + leg morphism construction. |
 
-**Ad-hoc demos** (pre-suite, kept for history)
+**Server**
 
 | File | What |
 |---|---|
-| `main.jl`         | Populates a single rich `ClinicalStateMulti` instance. |
-| `visualize.jl`    | Renders schema + that state. |
-| `rule_dm2.jl`     | Scenario matrix for the DM2-add rule. |
-| `vignette_dm2.jl` | Realistic patient vignette: rule fires, NAC blocks re-firing. |
+| `cds_server.jl` | HTTP.jl server. One endpoint: `POST /fire { rule, host } → { status, detail, state }`. PORT reads from `ENV["PORT"]` for hosted environments, falls back to 8081 locally. |
 
-## A categorical note on the resolve rule
+**UI**
 
-The DM2-resolve rule is intentionally design-only. Status flips on a *preserved*
-Hom target cannot be expressed as a runtime `Rule{:DPO}` under
-AlgebraicRewriting's current monicness check on r-AttrType components combined
-with the schema's total `probStatus::Hom(Problem, Status)`. The structural span
-(`L_resolve ← K_resolve → R_resolve`) is still constructed and visualized, so
-the design is documented in code; firing it would require a schema change to a
-junction-`Ob` event model. See the header of `rule_dm2_resolve_core.jl` for
-the full categorical reasoning.
+| Path | What |
+|---|---|
+| `ui/` | Vite + React + TypeScript app for visually composing FHIR resource graphs (nodes = resources, edges = references). Reads/writes the same FHIR Bundles the engine consumes. Engine URL comes from `VITE_CDS_URL` (defaults to `http://localhost:8081`). |
+
+**Deploy**
+
+| File | What |
+|---|---|
+| `Dockerfile`, `.dockerignore`, `railway.json` | Engine container for Railway (or any container host). |
+| `.github/workflows/deploy-ui.yml`             | Builds `ui/dist` and publishes to Cloudflare Pages on push to main. |
+| `DEPLOY.md`                                   | Full walkthrough including account setup. |
