@@ -202,7 +202,11 @@ export function App() {
   // samples seed in. Users' custom-saved rules under the old key are
   // preserved (still in storage) but unreachable until manually
   // re-imported. Worth it to avoid shipping a broken seed.
-  const LS_KEY = 'algebraic_cds_rules_v14';
+  // Bump the v-number when shipping new sample rules or breaking changes
+  // to the rule schema. Bumping invalidates every visitor's cached library
+  // and forces a re-seed from sampleRules.ts.
+  //   v14 → v15: rule CIs gained a `display` field for merge disambiguation.
+  const LS_KEY = 'algebraic_cds_rules_v15';
   const [savedRules, setSavedRules] = useState<SavedRule[]>(() => {
     try {
       const raw = localStorage.getItem(LS_KEY);
