@@ -206,7 +206,9 @@ export function App() {
   // to the rule schema. Bumping invalidates every visitor's cached library
   // and forces a re-seed from sampleRules.ts.
   //   v14 → v15: rule CIs gained a `display` field for merge disambiguation.
-  const LS_KEY = 'algebraic_cds_rules_v15';
+  //   v15 → v16: reverted display fields; identity is now morphism-based
+  //              (linked-problem / linked-finding edges in codeKey).
+  const LS_KEY = 'algebraic_cds_rules_v16';
   const [savedRules, setSavedRules] = useState<SavedRule[]>(() => {
     try {
       const raw = localStorage.getItem(LS_KEY);
@@ -1442,56 +1444,85 @@ function mergePostFire(
     'MedicationRequest', 'Appointment', 'Encounter',
   ]);
   // codeKey identifies "the same FHIR resource" across the round trip.
-  // For each engine-tracked type, we include a disambiguating field
-  // (time / value) so resources that share a code but represent
-  // different events stay distinct in the merge:
-  //   * Observation:        effective + value  (multi-reading)
-  //   * Condition:          recordedDate       (multi-event diagnosis)
-  //   * ClinicalImpression: date               (each fire's assessment)
-  // Without this, the post-fire merge collapses two same-coded resources
-  // into one and the newResources count drops to zero, even though the
-  // engine actually added a row.
-  const codeKey = (n: typeof parsed.nodes[number]) => {
-    const base = `${n.type}|${n.fields.codeSystem ?? ''}|${n.fields.codeValue ?? ''}`;
-    if (n.type === 'Observation') {
-      return `${base}|${n.fields.effective ?? ''}|${n.fields.value ?? ''}`;
-    }
-    if (n.type === 'Condition') {
-      return `${base}|${n.fields.recordedDate ?? ''}`;
-    }
-    if (n.type === 'ClinicalImpression') {
-      // ClinicalImpression rarely carries a SNOMED/LOINC code in our
-      // rules, so `display` is the practical differentiator between two
-      // assessments (e.g. "HTN assessment" vs "DM2 assessment") that
-      // happen to share a recorded date. Without it, two same-day rules
-      // produce CIs that codeKey can't distinguish and the merge silently
-      // collapses them to one row.
-      return `${base}|${n.fields.date ?? ''}|${n.fields.display ?? ''}`;
-    }
-    // MedicationRequest is now coded (RxNorm) — same disambiguator as
-    // Observation/Condition: codeSystem + codeValue + status. Two
-    // active metformin orders should still collapse to the same key.
-    if (n.type === 'MedicationRequest') {
-      return `${n.type}|${n.fields.codeSystem ?? ''}|${n.fields.codeValue ?? ''}|${n.fields.status ?? ''}`;
-    }
-    if (n.type === 'Appointment') {
-      // Code + start disambiguates an existing appt from a fresh
-      // referral with the same serviceType.
-      return `${n.type}|${n.fields.codeSystem ?? ''}|${n.fields.codeValue ?? ''}|${n.fields.start ?? ''}|${n.fields.status ?? ''}`;
-    }
-    if (n.type === 'Encounter') {
-      return `${n.type}|${n.fields.codeSystem ?? ''}|${n.fields.codeValue ?? ''}|${n.fields.start ?? ''}`;
-    }
-    return base;
+  // Principle: identity = local attrs + every outgoing engine-schema
+  // morphism. A resource is what it is plus what it relates to, so
+  // every Hom in clinical_state_multi.jl should participate where
+  // applicable. Doing this in the merge instead of "by code only"
+  // means rules that produce resources with overlapping attributes but
+  // distinct relationships stay distinct end-to-end (e.g., HTN's
+  // ClinicalImpression diagnosing the HTN Condition vs DM2's CI
+  // diagnosing the DM2 Condition — same date, same null code, but
+  // different problem-morphism targets).
+  //
+  // Per type:
+  //   * Observation:        effective + value (leaf — no outgoing Homs)
+  //   * Condition:          recordedDate      (leaf — no outgoing Homs)
+  //   * ClinicalImpression: date + Finding morphisms + Diagnosis morphisms
+  //   * MedicationRequest:  code + status + MedReason morphisms
+  //   * Appointment:        code + start + status + ApptBasedOn morphisms
+  //   * Encounter:          code + start     (leaf — no outgoing Homs)
+  //
+  // Subject → Patient edges are deliberately NOT included: Patient is a
+  // UI passthrough, not in the engine schema, and post-fire subject-edge
+  // auto-wiring happens *after* the merge runs. Mixing them in would
+  // make pre/parsed signatures mismatch on resources that should match.
+  const makeCodeKey = (nodes: typeof parsed.nodes, edges: typeof parsed.edges) => {
+    const byId = new Map(nodes.map((n) => [n.id, n] as const));
+    const linkSig = (n: typeof parsed.nodes[number], label: string) =>
+      edges
+        .filter((e) => e.from === n.id && e.label === label)
+        .map((e) => {
+          const t = byId.get(e.to);
+          return t ? `${t.fields.codeSystem ?? ''}:${t.fields.codeValue ?? ''}` : '';
+        })
+        .sort()
+        .join(',');
+
+    return (n: typeof parsed.nodes[number]) => {
+      const base = `${n.type}|${n.fields.codeSystem ?? ''}|${n.fields.codeValue ?? ''}`;
+      if (n.type === 'Observation') {
+        return `${base}|${n.fields.effective ?? ''}|${n.fields.value ?? ''}`;
+      }
+      if (n.type === 'Condition') {
+        return `${base}|${n.fields.recordedDate ?? ''}`;
+      }
+      if (n.type === 'ClinicalImpression') {
+        // Identity = date + every outgoing morphism. A CI IS its
+        // assessment of a specific set of problems (Diagnosis junction)
+        // grounded in a specific set of findings (Finding junction);
+        // change either set and you have a different assessment.
+        return `${base}|${n.fields.date ?? ''}|p:${linkSig(n, 'problem')}|f:${linkSig(n, 'finding')}`;
+      }
+      // MedicationRequest is coded (RxNorm) AND scoped to the Condition
+      // it's prescribed for (reasonReference → Cond). Two metformin
+      // orders for two different diagnoses aren't the same order.
+      if (n.type === 'MedicationRequest') {
+        return `${base}|${n.fields.status ?? ''}|${linkSig(n, 'reasonReference')}`;
+      }
+      // Appointment is coded (serviceType) + start-time + the Condition
+      // it's basedOn. A second ophth referral that points at a fresh
+      // diagnosis is a fresh appointment, even if the start time
+      // happens to round to the same wall clock.
+      if (n.type === 'Appointment') {
+        return `${base}|${n.fields.start ?? ''}|${n.fields.status ?? ''}|${linkSig(n, 'basedOn')}`;
+      }
+      if (n.type === 'Encounter') {
+        return `${n.type}|${n.fields.codeSystem ?? ''}|${n.fields.codeValue ?? ''}|${n.fields.start ?? ''}`;
+      }
+      return base;
+    };
   };
+
+  const preCodeKey = makeCodeKey(prePatient.nodes, prePatient.edges);
+  const parsedCodeKey = makeCodeKey(parsed.nodes, parsed.edges);
 
   const idMap = new Map<string, string>();
   const preEngineByKey = new Map<string, string>();
   for (const n of prePatient.nodes) {
-    if (ENGINE_TYPES.has(n.type)) preEngineByKey.set(codeKey(n), n.id);
+    if (ENGINE_TYPES.has(n.type)) preEngineByKey.set(preCodeKey(n), n.id);
   }
   for (const n of parsed.nodes) {
-    const orig = preEngineByKey.get(codeKey(n));
+    const orig = preEngineByKey.get(parsedCodeKey(n));
     if (orig) idMap.set(n.id, orig);
   }
 
