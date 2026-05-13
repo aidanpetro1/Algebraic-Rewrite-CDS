@@ -430,7 +430,10 @@ export function DetailPanel({
                   ) => {
                     const next = { ...p, ...patch };
                     if (patch.attribute !== undefined) {
-                      const newSpec = attrSpec(node.type, next.attribute);
+                      // Use patch.attribute (TS narrows it to string here)
+                      // rather than next.attribute, which the spread widens
+                      // back to `string | undefined`.
+                      const newSpec = attrSpec(node.type, patch.attribute);
                       const newOps = newSpec ? opsForType(newSpec.type) : [];
                       // Operator: keep if still valid, else jump to first.
                       if (newSpec && !newOps.includes(next.operator ?? '')) {
