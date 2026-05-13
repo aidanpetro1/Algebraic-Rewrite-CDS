@@ -9,17 +9,30 @@
 
 import type { PaletteGroup, TypeInfo, Node, Edge, Predicate } from '../lib/types';
 
+// Only resource types the engine actually parses are exposed in the
+// palette. Adding others here would let users drag a node onto the canvas
+// that errors on fire because clinical_state_multi.jl has no Ob for it.
+// The mapping is:
+//   Patient            — UI passthrough (subject-of-everything; not an Ob)
+//   Observation        — clinical_state_multi.jl Ob
+//   Condition          — clinical_state_multi.jl Ob
+//   ClinicalImpression — clinical_state_multi.jl Ob
+//   Encounter          — clinical_state_multi.jl Ob
+//   Appointment        — clinical_state_multi.jl Ob
+//   MedicationRequest  — clinical_state_multi.jl Ob
+// To add a new resource type: extend the schema (Ob + attrs + linker
+// Homs), parse/serialize/fhir_to_rule per the file guide in README, then
+// add it here. Keeping this list in sync with the engine is enforced
+// nowhere — silent palette drift is a real risk.
 export const PALETTE_GROUPS: PaletteGroup[] = [
   {
     name: 'Clinical',
     cls: 'cat-clinical',
     items: [
       { type: 'Patient', short: 'Pa' },
-      { type: 'Practitioner', short: 'Pr' },
       { type: 'Condition', short: 'Co' },
       { type: 'Observation', short: 'Ob' },
       { type: 'ClinicalImpression', short: 'CI' },
-      { type: 'AllergyIntolerance', short: 'Al' },
     ],
   },
   {
@@ -28,35 +41,13 @@ export const PALETTE_GROUPS: PaletteGroup[] = [
     items: [
       { type: 'Encounter', short: 'En' },
       { type: 'Appointment', short: 'Ap' },
-      { type: 'CarePlan', short: 'Cp' },
-      { type: 'Task', short: 'Ts' },
     ],
   },
   {
     name: 'Medications',
     cls: 'cat-meds',
     items: [
-      { type: 'Medication', short: 'Md' },
       { type: 'MedicationRequest', short: 'Mr' },
-      { type: 'MedicationStatement', short: 'Ms' },
-    ],
-  },
-  {
-    name: 'Diagnostics',
-    cls: 'cat-diag',
-    items: [
-      { type: 'DiagnosticReport', short: 'Dr' },
-      { type: 'Procedure', short: 'Pc' },
-      { type: 'ImagingStudy', short: 'Im' },
-    ],
-  },
-  {
-    name: 'Administrative',
-    cls: 'cat-admin',
-    items: [
-      { type: 'Organization', short: 'Or' },
-      { type: 'Location', short: 'Lo' },
-      { type: 'Coverage', short: 'Cv' },
     ],
   },
 ];

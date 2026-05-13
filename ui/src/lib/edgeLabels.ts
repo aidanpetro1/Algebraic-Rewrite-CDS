@@ -39,29 +39,10 @@ const REFERENCE_LABELS: Record<string, Record<string, string[]>> = {
     Medication:   ['medication'],
     Condition:    ['reasonReference'],
   },
-  MedicationStatement: {
-    Patient:      ['subject'],
-    Practitioner: ['informationSource'],
-    Medication:   ['medication'],
-    Condition:    ['reasonReference'],
-  },
-  Procedure: {
-    Patient:      ['subject'],
-    Encounter:    ['encounter'],
-    Practitioner: ['performer'],
-    Condition:    ['reasonReference'],
-    Observation:  ['reasonReference'],
-  },
   Appointment: {
     Patient:      ['participant'],
     Practitioner: ['participant'],
     Location:     ['participant'],
-  },
-  DiagnosticReport: {
-    Patient:      ['subject'],
-    Encounter:    ['encounter'],
-    Practitioner: ['performer'],
-    Observation:  ['result'],
   },
   Encounter: {
     Patient:      ['subject'],
@@ -69,49 +50,10 @@ const REFERENCE_LABELS: Record<string, Record<string, string[]>> = {
     Location:     ['location'],
     Organization: ['serviceProvider'],
   },
-  CarePlan: {
-    Patient:      ['subject'],
-    Encounter:    ['encounter'],
-    Condition:    ['addresses'],
-    Practitioner: ['author'],
-  },
-  Task: {
-    Patient:      ['for'],
-    Encounter:    ['encounter'],
-    Practitioner: ['requester', 'owner'],
-  },
-  AllergyIntolerance: {
-    Patient:      ['patient'],
-    Encounter:    ['encounter'],
-    Practitioner: ['recorder', 'asserter'],
-  },
-  ImagingStudy: {
-    Patient:      ['subject'],
-    Encounter:    ['encounter'],
-    Practitioner: ['referrer', 'interpreter'],
-  },
-  ServiceRequest: {
-    Patient:      ['subject'],
-    Encounter:    ['encounter'],
-    Practitioner: ['requester', 'performer'],
-    Condition:    ['reasonReference'],
-    Observation:  ['supportingInfo'],
-  },
-  Communication: {
-    Patient:      ['subject'],
-    Encounter:    ['encounter'],
-    Practitioner: ['sender', 'recipient'],
-  },
-  Goal: {
-    Patient:      ['subject'],
-    Condition:    ['addresses'],
-    Practitioner: ['expressedBy'],
-  },
-  Specimen: {
-    Patient:      ['subject'],
-    Practitioner: ['collection.collector'],
-  },
-  // ClinicalImpression also commonly references previous CIs.
+  // (Source entries for Procedure, MedicationStatement, DiagnosticReport,
+  // CarePlan, Task, AllergyIntolerance, ImagingStudy, ServiceRequest,
+  // Communication, Goal, Specimen are intentionally absent — those types
+  // aren't in the palette, so a node can never have them as a source.)
 };
 
 // Reverse-direction lookup. When the user drags from B to A and (B → A)

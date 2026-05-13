@@ -42,26 +42,16 @@ const DEFAULTS: Record<string, FieldMap> = {
     date: '',
   },
 
-  // Clinical (not yet round-tripped — schema doesn't have homes for these).
+  // Patient is a UI passthrough — the engine doesn't have an Ob for it,
+  // but every clinical resource auto-wires a subject → Patient edge after
+  // fire (see App.tsx mergePostFire), so authoring one is meaningful.
   Patient: {
     name: '',
     gender: '',
     birthDate: '',
     identifier: '',
   },
-  Practitioner: {
-    name: '',
-    qualification: '',
-    identifier: '',
-  },
-  AllergyIntolerance: {
-    codeDisplay: '',
-    code: '',
-    clinicalStatus: 'active',
-    criticality: '',
-  },
 
-  // Workflow.
   Encounter: {
     codeSystem:  '',
     codeValue:   '',
@@ -79,24 +69,7 @@ const DEFAULTS: Record<string, FieldMap> = {
     start:       '',
     end:         '',
   },
-  CarePlan: {
-    title: '',
-    status: 'active',
-    intent: 'plan',
-  },
-  Task: {
-    description: '',
-    status: 'requested',
-    intent: 'order',
-  },
 
-  // Medications.
-  Medication: {
-    codeDisplay: '',
-    code: '',
-    form: '',
-    manufacturer: '',
-  },
   MedicationRequest: {
     codeSystem:  '',
     codeValue:   '',
@@ -104,45 +77,6 @@ const DEFAULTS: Record<string, FieldMap> = {
     status:      'active',
     intent:      'order',
     dosage:      '',
-  },
-  MedicationStatement: {
-    medication: '',
-    status: 'active',
-  },
-
-  // Diagnostics.
-  DiagnosticReport: {
-    codeDisplay: '',
-    status: 'final',
-    code: '',
-    effective: '',
-  },
-  Procedure: {
-    codeDisplay: '',
-    status: 'completed',
-    code: '',
-    performed: '',
-  },
-  ImagingStudy: {
-    display: '',
-    status: 'available',
-    modality: '',
-  },
-
-  // Administrative.
-  Organization: {
-    name: '',
-    type: '',
-    identifier: '',
-  },
-  Location: {
-    name: '',
-    type: '',
-  },
-  Coverage: {
-    display: '',
-    status: 'active',
-    type: '',
   },
 };
 

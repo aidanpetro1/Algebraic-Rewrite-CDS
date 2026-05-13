@@ -133,45 +133,12 @@ const addMedication: Pick<RuleTemplate, 'nodes' | 'edges' | 'predicates' | 'defa
 };
 
 // ============================================================
-// 3. Add procedure recommendation
-//    L  = Condition (preserved)
-//    R  = + Procedure (new)
-//    N1 = the same Procedure (forbidden as pre-existing)
+// (Removed: "Add procedure recommendation" — engine has no Procedure Ob
+// yet. Re-add once clinical_state_multi.jl ships one.)
 // ============================================================
-const addProcedure: Pick<RuleTemplate, 'nodes' | 'edges' | 'predicates' | 'defaultSelectedId'> = {
-  nodes: [
-    {
-      id: 'cond',
-      type: 'Condition',
-      x: 280, y: 380,
-      legs: ['L', 'K', 'R', 'N1'],
-      fields: {
-        codeSystem:     '',
-        codeValue:      '',
-        codeDisplay:    '${display}',
-        clinicalStatus: 'active',
-        recordedDate:   '${time}',
-      },
-    },
-    {
-      id: 'proc',
-      type: 'Procedure',
-      x: 720, y: 380,
-      legs: ['R', 'N1'],
-      fields: {
-        status:    'completed',
-        code:      '${procedureCode}',
-        performed: '${now}',
-      },
-    },
-  ],
-  edges: [],
-  predicates: [],
-  defaultSelectedId: 'cond',
-};
 
 // ============================================================
-// 4. Resolve diagnosis
+// Resolve diagnosis
 //    L  = Condition + Observation that disagrees with the diagnosis
 //    K  = Observation (preserved)
 //    R  = Observation only — the Condition is DELETED by L \ K
@@ -328,65 +295,14 @@ const referToSpecialty: Pick<RuleTemplate, 'nodes' | 'edges' | 'predicates' | 'd
 };
 
 // ============================================================
-// 7. Re-screen if overdue
-//    L  = Condition (preserved) — the chronic disease driving the screen
-//    R  = + Procedure (proposed screening)
-//    N1 = past Procedure of the same code performed recently
-//         (the recency window is intended to be authored as a predicate
-//         once the FHIRPath subset interpreter ships; for now the NAC
-//         is structural-only — any prior screening with the same code blocks)
+// (Removed: "Re-screen if overdue" — depended on a Procedure Ob the
+// engine doesn't ship yet. Re-add when the schema grows one. The
+// referToSpecialty template uses Encounter for the same prior-event
+// pattern and can serve as the model.)
 // ============================================================
-const reScreenIfOverdue: Pick<RuleTemplate, 'nodes' | 'edges' | 'predicates' | 'defaultSelectedId'> = {
-  nodes: [
-    {
-      id: 'cond',
-      type: 'Condition',
-      x: 240, y: 380,
-      legs: ['L', 'K', 'R'],
-      fields: {
-        codeSystem:     '',
-        codeValue:      '',
-        codeDisplay:    '${display}',
-        clinicalStatus: '${status}',
-        recordedDate:   '${time}',
-      },
-    },
-    {
-      id: 'proc-prev',
-      type: 'Procedure',
-      x: 240, y: 180,
-      legs: ['N1'],
-      fields: {
-        // User fills in the screening code (e.g. SNOMED 396487001
-        // Mammography). Status literal — only completed screenings count.
-        codeSystem:  '',
-        codeValue:   '',
-        codeDisplay: '${prevDisplay}',
-        status:      'completed',
-        performed:   '${prevPerformed}',
-      },
-    },
-    {
-      id: 'proc-new',
-      type: 'Procedure',
-      x: 720, y: 380,
-      legs: ['R'],
-      fields: {
-        codeSystem:  '',
-        codeValue:   '',
-        codeDisplay: '${screeningDisplay}',
-        status:      'preparation',
-        performed:   '${now}',
-      },
-    },
-  ],
-  edges: [],
-  predicates: [],
-  defaultSelectedId: 'cond',
-};
 
 // ============================================================
-// 8. Drug-disease contraindication
+// Drug-disease contraindication
 //    L  = Condition (the contraindicating diagnosis, e.g. CKD)
 //         AND existing MedicationRequest of the contraindicated drug
 //    R  = MedicationRequest deleted (status changed via the rewrite —
@@ -469,12 +385,6 @@ export const RULE_TEMPLATES: RuleTemplate[] = [
     ...addMedication,
   },
   {
-    id: 'add-procedure',
-    name: 'Add procedure',
-    description: 'Condition exists → add Procedure recommendation. Fill in condition + procedure codes.',
-    ...addProcedure,
-  },
-  {
     id: 'resolve-diagnosis',
     name: 'Resolve diagnosis',
     description: 'Observation in normal range alongside Condition → delete the Condition. Fill in codes + threshold.',
@@ -491,12 +401,6 @@ export const RULE_TEMPLATES: RuleTemplate[] = [
     name: 'Refer to specialty',
     description: 'Condition exists AND no recent specialty Encounter → propose a referral Appointment. Fill in condition code + specialty code.',
     ...referToSpecialty,
-  },
-  {
-    id: 're-screen-if-overdue',
-    name: 'Re-screen if overdue',
-    description: 'Condition exists AND no prior screening Procedure of the same code → propose a new screening. Fill in condition + screening codes.',
-    ...reScreenIfOverdue,
   },
   {
     id: 'drug-disease-contraindication',

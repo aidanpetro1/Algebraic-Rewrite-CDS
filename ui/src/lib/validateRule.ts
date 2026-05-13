@@ -32,7 +32,7 @@ const isPlaceholder = (v: string | undefined): boolean =>
 // that type, which is almost never what the author meant.
 const CODED_TYPES = new Set([
   'Observation', 'Condition', 'MedicationRequest',
-  'Appointment', 'Encounter', 'Procedure',
+  'Appointment', 'Encounter',
 ]);
 
 const hasLiteralCode = (n: Node): boolean => {

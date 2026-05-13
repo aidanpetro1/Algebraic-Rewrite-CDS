@@ -93,16 +93,8 @@ const medications: CodeEntry[] = [
   { system: RXNORM, code: '855288',   display: 'warfarin 5 MG oral tablet',       kind: 'medication', synonyms: ['warfarin', 'coumadin'] },
 ];
 
-// ---------- Procedures / screenings (SNOMED CT) ----------
-const procedures: CodeEntry[] = [
-  { system: SNOMED, code: '722112000',  display: 'Diabetic retinopathy screening procedure', kind: 'procedure', synonyms: ['retinopathy screening', 'eye screening'] },
-  { system: SNOMED, code: '275944005',  display: 'Diabetic foot examination',      kind: 'procedure', synonyms: ['foot exam'] },
-  { system: SNOMED, code: '171207006',  display: 'Depression screening',           kind: 'procedure', synonyms: ['phq', 'phq-9'] },
-  { system: SNOMED, code: '396487001',  display: 'Mammography screening',          kind: 'procedure', synonyms: ['mammogram'] },
-  { system: SNOMED, code: '73761001',   display: 'Colonoscopy',                    kind: 'procedure', synonyms: ['colon screening'] },
-  { system: SNOMED, code: '171149006',  display: 'Influenza vaccination',          kind: 'procedure', synonyms: ['flu shot'] },
-  { system: SNOMED, code: '171121004',  display: 'Pneumococcal vaccination',       kind: 'procedure', synonyms: ['pneumonia vaccine'] },
-];
+// (Procedure / screening codes removed — engine has no Procedure Ob yet.
+// Re-add this block when clinical_state_multi.jl gains a Procedure type.)
 
 // ---------- Specialties (SNOMED CT — for Encounter.type) ----------
 const specialties: CodeEntry[] = [
@@ -121,7 +113,7 @@ const specialties: CodeEntry[] = [
 // allowed kinds (Condition → 'condition', Observation → 'observation',
 // MedicationRequest → 'medication', Encounter → 'specialty', etc.).
 export const CODE_LIBRARY: CodeEntry[] = [
-  ...conditions, ...observations, ...medications, ...procedures, ...specialties,
+  ...conditions, ...observations, ...medications, ...specialties,
 ];
 
 // Which `kind`s are clinically appropriate for a given FHIR resource type.
@@ -131,9 +123,7 @@ export const KINDS_FOR_TYPE: Record<string, CodeKind[]> = {
   Condition:         ['condition'],
   Observation:       ['observation'],
   MedicationRequest: ['medication'],
-  MedicationStatement: ['medication'],
-  Procedure:         ['procedure'],
-  Appointment:       ['specialty', 'procedure'],
+  Appointment:       ['specialty'],
   Encounter:         ['specialty'],
   // Allow everything for ambiguous types so the picker still works.
 };

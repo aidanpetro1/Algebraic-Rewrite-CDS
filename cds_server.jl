@@ -27,30 +27,49 @@ using JSON3
 # Local dev falls back to 8081, which matches the UI's default VITE_CDS_URL.
 const PORT = parse(Int, get(ENV, "PORT", "8081"))
 
-# CORS headers — permissive enough for local dev; tighten for production.
-# Includes Allow-Methods covering both the actual POST and the preflight
-# OPTIONS, plus Max-Age so the browser caches the preflight result and
-# doesn't re-issue OPTIONS for every request. Allow-Headers is wide
-# (Content-Type plus a wildcard) to head off picky browsers blocking on
-# any extra header the UI might add later.
-const _CORS = [
-    "Access-Control-Allow-Origin"  => "*",
-    "Access-Control-Allow-Methods" => "POST, GET, OPTIONS",
-    "Access-Control-Allow-Headers" => "Content-Type, Accept, Origin, X-Requested-With",
-    "Access-Control-Max-Age"       => "86400",
-]
+# Origin-aware CORS. We allow-list specific origins instead of `*` so a
+# random third-party page can't pose as the UI and call /fire on the
+# user's behalf. The Origin header from the request is echoed back when
+# it's in the allow set; otherwise the header is empty and the browser
+# blocks the response. `Vary: Origin` is important — without it, a CDN
+# could cache one origin's CORS response and hand it to a different one.
+#
+# Production is the deployed Pages domain; localhost variants are kept so
+# `npm run dev` (Vite default 5173) and `npm run preview` (default 4173)
+# keep working without a separate config flag.
+const _ALLOWED_ORIGINS = Set([
+    "https://algebraic-cds.pages.dev",
+    "http://localhost:5173",
+    "http://localhost:4173",
+])
 
-_json_response(status_code::Int, body) = HTTP.Response(
-    status_code, [_CORS..., "Content-Type" => "application/json"],
+function _cors_headers(req::HTTP.Request)
+    origin = HTTP.header(req, "Origin", "")
+    allow = origin in _ALLOWED_ORIGINS ? origin : ""
+    [
+        "Access-Control-Allow-Origin"  => allow,
+        "Vary"                         => "Origin",
+        "Access-Control-Allow-Methods" => "POST, GET, OPTIONS",
+        "Access-Control-Allow-Headers" => "Content-Type, Accept, Origin, X-Requested-With",
+        "Access-Control-Max-Age"       => "86400",
+    ]
+end
+
+_json_response(req::HTTP.Request, status_code::Int, body) = HTTP.Response(
+    status_code,
+    [_cors_headers(req)..., "Content-Type" => "application/json"],
     JSON3.write(body),
 )
 
-_text_response(status_code::Int, msg::String) = HTTP.Response(
-    status_code, [_CORS..., "Content-Type" => "text/plain"], msg,
+_text_response(req::HTTP.Request, status_code::Int, msg::String) = HTTP.Response(
+    status_code,
+    [_cors_headers(req)..., "Content-Type" => "text/plain"],
+    msg,
 )
 
-# Browser preflight handler — return 204 No Content with the CORS headers.
-options_handler(_req) = HTTP.Response(204, _CORS)
+# Browser preflight handler — return 204 No Content with the CORS headers
+# for this specific request's Origin.
+options_handler(req::HTTP.Request) = HTTP.Response(204, _cors_headers(req))
 
 function fire_handler(req::HTTP.Request)
     try
@@ -73,7 +92,7 @@ function fire_handler(req::HTTP.Request)
         # so the UI's display logic stays uniform.
         out_bundle = acset_to_fhir(state_post)
 
-        return _json_response(200, Dict(
+        return _json_response(req, 200, Dict(
             "status" => string(status),
             "detail" => detail,
             "state"  => out_bundle,
@@ -82,7 +101,7 @@ function fire_handler(req::HTTP.Request)
         # Any error during parse/fire/serialize bubbles up here. Send a
         # 400 with a useful message rather than crashing the server loop.
         msg = sprint(showerror, e)
-        return _text_response(400, "fire failed: $msg")
+        return _text_response(req, 400, "fire failed: $msg")
     end
 end
 
@@ -92,9 +111,9 @@ function router(req::HTTP.Request)
     elseif req.method == "POST" && req.target == "/fire"
         return fire_handler(req)
     elseif req.method == "GET" && req.target == "/"
-        return _text_response(200, "Algebraic_CDS rule engine — POST /fire to fire a rule.\n")
+        return _text_response(req, 200, "Algebraic_CDS rule engine — POST /fire to fire a rule.\n")
     else
-        return _text_response(404, "not found: $(req.method) $(req.target)\n")
+        return _text_response(req, 404, "not found: $(req.method) $(req.target)\n")
     end
 end
 
