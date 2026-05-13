@@ -113,8 +113,8 @@ export function Topbar({
 
   return (
     <div className="topbar">
-      {/* Brand cluster — logo + title + unsaved indicator */}
-      <div className="logo">F</div>
+      {/* Brand cluster — title + unsaved indicator. Logo placeholder
+          removed; title carries the brand on its own for now. */}
       <div className="title">FHIR Graph Builder</div>
       <span className="badge unsaved dot" style={{ marginLeft: 6 }}>Unsaved</span>
 
@@ -364,8 +364,8 @@ export function Topbar({
         )}
       </div>
 
-      <div style={{ width: 6 }} />
-      <div className="avatar">MC</div>
+      {/* Avatar placeholder removed; reinstate when there's actual auth /
+          per-user identity to display. */}
     </div>
   );
 }
