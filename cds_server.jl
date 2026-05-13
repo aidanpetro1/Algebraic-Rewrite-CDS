@@ -37,15 +37,31 @@ const PORT = parse(Int, get(ENV, "PORT", "8081"))
 # Production is the deployed Pages domain; localhost variants are kept so
 # `npm run dev` (Vite default 5173) and `npm run preview` (default 4173)
 # keep working without a separate config flag.
+# Exact origins (production hostnames + local dev ports). Add new
+# production URLs here as they come online (custom domain, alt deploys).
 const _ALLOWED_ORIGINS = Set([
+    "https://algebraic-cds.aidanpetrovich.workers.dev",
     "https://algebraic-cds.pages.dev",
     "http://localhost:5173",
     "http://localhost:4173",
 ])
 
+# Pattern matching for Cloudflare preview deployments. Each preview build
+# gets a subdomain like `<hash>.algebraic-cds.aidanpetrovich.workers.dev`
+# or `<branch>.algebraic-cds.pages.dev`. Without this, opening a preview
+# URL from the deployments list silently fails CORS.
+const _ALLOWED_ORIGIN_PATTERNS = [
+    r"^https://[a-z0-9-]+\.algebraic-cds\.aidanpetrovich\.workers\.dev$",
+    r"^https://[a-z0-9-]+\.algebraic-cds\.pages\.dev$",
+]
+
+_origin_allowed(origin::AbstractString) =
+    origin in _ALLOWED_ORIGINS ||
+    any(p -> occursin(p, origin), _ALLOWED_ORIGIN_PATTERNS)
+
 function _cors_headers(req::HTTP.Request)
     origin = HTTP.header(req, "Origin", "")
-    allow = origin in _ALLOWED_ORIGINS ? origin : ""
+    allow = _origin_allowed(origin) ? origin : ""
     [
         "Access-Control-Allow-Origin"  => allow,
         "Vary"                         => "Origin",
