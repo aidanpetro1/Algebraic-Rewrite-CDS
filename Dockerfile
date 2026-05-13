@@ -6,8 +6,11 @@
 #
 # Heads-up: Julia precompiles Catlab + AlgebraicRewriting during image build,
 # which is slow (~5–10 min). That's the price for sub-second startup at runtime.
+#
+# Julia version must match the version the local Manifest.toml was resolved
+# against (currently 1.12). Mismatched stdlib versions cause precompile failures.
 
-FROM julia:1.10-bookworm
+FROM julia:1.12-bookworm
 
 WORKDIR /app
 
