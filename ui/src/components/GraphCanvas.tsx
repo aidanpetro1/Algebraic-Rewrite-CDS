@@ -32,6 +32,11 @@ function nodePreviewFields(
   nodeId: string,
   ruleMode: boolean,
   predicates: Array<{ target: string; label: string; attribute?: string; operator?: string; value?: string; fhirpath?: string }>,
+  // Optional graph context. Used to derive a human-readable label for
+  // resources (like ClinicalImpression) that have no display field of
+  // their own — their identity is the morphism, so the label comes from
+  // *what they link to*, not from a stored string.
+  graphCtx?: { edges: Edge[]; nodesById: Map<string, Node> },
 ): PreviewLine[] {
   // Skip empty + template-placeholder values. Placeholders are
   // engine-internal AttrVar names ("${bp}", "${existingDisplay}", …);
@@ -109,10 +114,24 @@ function nodePreviewFields(
     return out;
   }
   if (type === 'ClinicalImpression') {
+    // CI has no display field of its own — its identity is the set of
+    // problems it diagnoses (Diagnosis junction). Derive the prominent
+    // label from those linked Condition displays. This is rendering
+    // only; codeKey already uses the same morphism for merge identity,
+    // so canvas label and identity stay in lockstep.
+    const out: PreviewLine[] = [];
+    if (graphCtx) {
+      const probDisplays = graphCtx.edges
+        .filter((e) => e.from === nodeId && e.label === 'problem')
+        .map((e) => trimmed(graphCtx.nodesById.get(e.to)?.fields.codeDisplay))
+        .filter(Boolean);
+      if (probDisplays.length > 0) {
+        out.push({ text: `Assessment: ${probDisplays.join(' + ')}`, prominent: true });
+      }
+    }
     const status = trimmed(fields.status);
     const date   = trimmed(fields.date);
-    const out: PreviewLine[] = [];
-    if (status) out.push({ text: status, prominent: true });
+    if (status) out.push({ text: status });
     if (date)   out.push({ text: date });
     return out;
   }
@@ -855,10 +874,19 @@ export function GraphCanvas({
             </div>
           );
         })}
-        {nodes.map((n) => {
+        {(() => {
+          // Build id → node lookup once per render. Used by
+          // nodePreviewFields to follow morphisms when deriving labels
+          // for resources that don't have their own display field
+          // (currently: ClinicalImpression → linked Conditions).
+          const nodesById = new Map<string, Node>(nodes.map((n) => [n.id, n]));
+          return nodes.map((n) => {
           const p = posRef.current[n.id] || { x: n.x, y: n.y };
           const info = TYPE_INFO[n.type] || { cls: 'cat-admin', short: '?' };
-          const previewFields = nodePreviewFields(n.type, n.fields || {}, n.id, !!showLegs, predicates);
+          const previewFields = nodePreviewFields(
+            n.type, n.fields || {}, n.id, !!showLegs, predicates,
+            { edges, nodesById },
+          );
           // Leg-filter dimming: a node is "outside" the active filter if it
           // has no legs at all, or none matching the selected leg. In rule
           // mode with no filter, untagged nodes still render at full
@@ -979,7 +1007,8 @@ export function GraphCanvas({
               )}
             </div>
           );
-        })}
+        });
+        })()}
       </div>
 
       {dropHint && (

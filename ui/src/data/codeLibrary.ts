@@ -128,6 +128,20 @@ export const KINDS_FOR_TYPE: Record<string, CodeKind[]> = {
   // Allow everything for ambiguous types so the picker still works.
 };
 
+// Resolve a (system, code) pair to its canonical display string. Used
+// as a fallback so NAC patterns — whose codeDisplay is a template
+// variable like '${existingDisplay}' so the NAC matches any pre-existing
+// resource of that code regardless of how its display was authored —
+// still render a meaningful label on the canvas. The display surfaces
+// from the LITERAL identity (system + value), the NAC's actual matching
+// criterion, rather than from a templated string.
+const _CODE_INDEX = new Map<string, string>();
+for (const e of CODE_LIBRARY) _CODE_INDEX.set(`${e.system}|${e.code}`, e.display);
+export function displayByCode(system: string, code: string): string {
+  if (!system || !code) return '';
+  return _CODE_INDEX.get(`${system}|${code}`) ?? '';
+}
+
 // Search the library by free text. Matches against display + synonyms,
 // case-insensitive, substring. Limits the kinds to those clinically
 // appropriate for the FHIR resource being authored.

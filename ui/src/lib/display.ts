@@ -5,14 +5,21 @@
 // display behavior.
 //
 // Order:
-//   codeDisplay  → coded resources (Observation, Condition, ...)
-//   display      → resources we authored a generic display field for
-//                  (ClinicalImpression, Encounter, Appointment, ...)
-//   name         → Patient, Practitioner, Organization, Location
-//   title        → CarePlan
-//   medication   → MedicationRequest, MedicationStatement
-//   description  → Task
-//   node.id      → final fallback so the card never renders blank
+//   codeDisplay         → coded resources (Observation, Condition, ...)
+//   codeLibrary lookup  → fall back to canonical display for (system,
+//                         value) when codeDisplay itself is a template
+//                         placeholder. Lets NAC patterns whose display
+//                         is templated ('${existingDisplay}') still
+//                         show a readable label on the canvas, because
+//                         their system+value is literal.
+//   display             → resources we authored a generic display field
+//                         for (ClinicalImpression, Encounter, Appointment,
+//                         ...)
+//   name                → Patient, Practitioner, Organization, Location
+//   title               → CarePlan
+//   medication          → MedicationRequest, MedicationStatement
+//   description         → Task
+//   node.id             → final fallback so the card never renders blank
 
 export interface FieldsOnly {
   fields: Record<string, string>;
@@ -36,11 +43,18 @@ export const hidePlaceholder = (v: string | undefined): string =>
 // or empty string if no display-like field is populated. Used by the
 // canvas card (which falls back to icon-only when empty). Template
 // placeholders are skipped so they don't leak into the rectangle.
+import { displayByCode } from '../data/codeLibrary';
+
 export function displayOf(fields: Record<string, string>): string {
   const pick = (s: string | undefined) =>
     s && s.trim() && !isPlaceholder(s) ? s.trim() : '';
   return (
     pick(fields.codeDisplay) ||
+    // (system, value) → canonical display via codeLibrary lookup.
+    // Triggers when codeDisplay is empty or '${var}' but the code
+    // triple's identity-bearing pair is literal — i.e., for NAC
+    // patterns of literally-identified resources.
+    displayByCode(fields.codeSystem ?? '', fields.codeValue ?? '') ||
     pick(fields.display) ||
     pick(fields.name) ||
     pick(fields.title) ||
