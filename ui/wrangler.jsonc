@@ -1,0 +1,16 @@
+// Cloudflare Workers Assets configuration for the algebraic-cds UI.
+//
+// Used by `npx wrangler deploy` (the Deploy command set in the Cloudflare
+// dashboard). Tells wrangler where the static build output lives and how to
+// handle SPA routes.
+{
+  "name": "algebraic-cds",
+  "compatibility_date": "2024-09-23",
+  "assets": {
+    // Path is relative to this file (ui/), pointing at the Vite build output.
+    "directory": "./dist",
+    // SPA fallback: any unknown path returns index.html so the client-side
+    // router can take over. Without this, deep links 404 on hard refresh.
+    "not_found_handling": "single-page-application"
+  }
+}
