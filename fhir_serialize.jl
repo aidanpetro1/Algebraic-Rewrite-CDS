@@ -8,12 +8,16 @@
 # type=collection. Caller serializes to JSON via JSON3 / JSON / similar.
 #
 # Bundle.entry.fullUrl is a deterministic UUIDv5 derived from resource
-# kind + ACSet row index, so the same state serializes to identical JSON
-# across calls — required for byte-equal round-trip and diffability.
+# kind + the row's CONTENT (code triple, time, status, …). It must NOT
+# depend on the ACSet row index: AlgebraicRewriting's DPO doesn't
+# preserve row indices across rewrites (new rows can prepend, freed
+# slots can be recycled), so an index-keyed UUID flips identity between
+# fires. Content-keyed UUIDs stay stable for the same logical resource
+# across any number of fires, which is what the UI's merge depends on.
 #
 # Public API:
 #   acset_to_fhir(state) -> Dict   FHIR Bundle
-#   fhir_fullurl(kind, idx) -> String   urn:uuid:<v5> for (kind, row)
+#   fhir_fullurl(kind, state, idx) -> String   urn:uuid:<v5> for (kind, row)
 
 include("clinical_state_multi.jl")
 
@@ -25,13 +29,69 @@ using UUIDs
 const _CDS_UUID_NAMESPACE = UUID("8a4b1f0e-3c2a-4d57-9f1e-5b3c2d1a0f9b")
 
 """
-    fhir_fullurl(kind::Symbol, idx::Int) -> String
+    _row_key(state, kind, idx) -> String
 
-Deterministic Bundle.entry.fullUrl for an ACSet row identified by
-(kind, idx). Same inputs always produce the same UUID.
+Content-based identity string for an ACSet row. The fields chosen are
+those that distinguish two logical resources in the FHIR sense — the
+code triple plus the time-of-event field. Two rows with the same key
+ARE the same logical resource (and so should share a fullUrl). Two
+rows with different keys are different resources.
 """
-fhir_fullurl(kind::Symbol, idx::Int) =
-    "urn:uuid:" * string(uuid5(_CDS_UUID_NAMESPACE, "$(kind)/$(idx)"))
+function _row_key(state::CState, kind::Symbol, idx::Int)::String
+    if kind == :Observation
+        # Effective time + magnitude disambiguate readings of the same
+        # code (e.g., two SBP readings a month apart).
+        return string(state[idx, :obsCodeSystem], "|",
+                      state[idx, :obsCodeValue], "|",
+                      state[idx, :obsEffective], "|",
+                      state[idx, :obsValueMagnitude])
+    elseif kind == :Condition
+        # recordedDate disambiguates two same-code diagnoses recorded at
+        # different times (e.g., recurrence after resolution).
+        return string(state[idx, :condCodeSystem], "|",
+                      state[idx, :condCodeValue], "|",
+                      state[idx, :condRecordedDate], "|",
+                      state[idx, :condClinicalStatus])
+    elseif kind == :ClinicalImpression
+        # CI has no code — its identity is the date plus the morphisms
+        # (problems/findings) it links to. We only have access to local
+        # attrs here, so date + status. Two CIs created in the same
+        # millisecond would collide; in practice rule fires resolve
+        # `${now}` to distinct timestamps.
+        return string(state[idx, :ciDate], "|", state[idx, :ciStatus])
+    elseif kind == :MedicationRequest
+        return string(state[idx, :mrCodeSystem], "|",
+                      state[idx, :mrCodeValue], "|",
+                      state[idx, :mrStatus], "|",
+                      state[idx, :mrIntent])
+    elseif kind == :Appointment
+        return string(state[idx, :apptCodeSystem], "|",
+                      state[idx, :apptCodeValue], "|",
+                      state[idx, :apptStart], "|",
+                      state[idx, :apptStatus])
+    elseif kind == :Encounter
+        return string(state[idx, :encCodeSystem], "|",
+                      state[idx, :encCodeValue], "|",
+                      state[idx, :encStart], "|",
+                      state[idx, :encStatus])
+    else
+        # Junctions and unknown types — no content keys defined, fall
+        # back to index. These don't show up in Bundle.entry.fullUrl
+        # anyway (they're encoded as nested arrays on their parents),
+        # so the fallback is for safety, not for correctness.
+        return "$(idx)"
+    end
+end
+
+"""
+    fhir_fullurl(kind::Symbol, state::CState, idx::Int) -> String
+
+Deterministic Bundle.entry.fullUrl. Same content → same UUID, across
+fires and across runs. Key is (kind, content) — see _row_key.
+"""
+fhir_fullurl(kind::Symbol, state::CState, idx::Int) =
+    "urn:uuid:" * string(uuid5(_CDS_UUID_NAMESPACE,
+        "$(kind)/$(_row_key(state, kind, idx))"))
 
 # ---------- per-resource builders ----------
 
@@ -197,12 +257,12 @@ Deterministic fullUrls (UUIDv5 from a fixed namespace) make the output
 diffable across runs and round-trip byte-equal.
 """
 function acset_to_fhir(state::CState)
-    obs_url(i)  = fhir_fullurl(:Observation, i)
-    cond_url(i) = fhir_fullurl(:Condition, i)
-    ci_url(i)   = fhir_fullurl(:ClinicalImpression, i)
-    mr_url(i)   = fhir_fullurl(:MedicationRequest, i)
-    appt_url(i) = fhir_fullurl(:Appointment, i)
-    enc_url(i)  = fhir_fullurl(:Encounter, i)
+    obs_url(i)  = fhir_fullurl(:Observation, state, i)
+    cond_url(i) = fhir_fullurl(:Condition, state, i)
+    ci_url(i)   = fhir_fullurl(:ClinicalImpression, state, i)
+    mr_url(i)   = fhir_fullurl(:MedicationRequest, state, i)
+    appt_url(i) = fhir_fullurl(:Appointment, state, i)
+    enc_url(i)  = fhir_fullurl(:Encounter, state, i)
 
     entries = Dict{String,Any}[]
 
