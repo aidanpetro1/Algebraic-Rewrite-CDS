@@ -74,7 +74,10 @@ export function App() {
   // on first load (or after onResetLibrary clears all algebraic_cds keys).
   // Bump suffix when the seed shape changes incompatibly so old saves
   // don't poison new sessions.
-  const PATIENT_KEY = 'algebraic_cds_patient_v1';
+  // Bumping the v-number invalidates every existing visitor's cached patient
+  // and forces them onto the current INITIAL_NODES seed. Use when the seed
+  // changes in a way you want everyone to see (e.g., generic demo patient).
+  const PATIENT_KEY = 'algebraic_cds_patient_v2';
   const [patientGraph, setPatientGraph] = useState<Graph>(() => {
     try {
       const raw = localStorage.getItem(PATIENT_KEY);

@@ -73,7 +73,7 @@ for (const g of PALETTE_GROUPS) {
 export const INITIAL_NODES: Node[] = [
   {
     id: 'pat-1', type: 'Patient', x: 600, y: 200,
-    fields: { name: 'Margaret Chen', gender: 'female', birthDate: '1962-04-18', identifier: 'MRN-4821' },
+    fields: { name: 'Sample Patient', gender: '', birthDate: '', identifier: 'MRN-0001' },
   },
   // Current visit — endocrinology follow-up where the high A1c and BPs
   // were recorded. SNOMED 394583002 = "Endocrinology" (clinical specialty).
