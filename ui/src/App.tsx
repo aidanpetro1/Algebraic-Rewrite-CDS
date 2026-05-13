@@ -1456,7 +1456,13 @@ function mergePostFire(
       return `${base}|${n.fields.recordedDate ?? ''}`;
     }
     if (n.type === 'ClinicalImpression') {
-      return `${base}|${n.fields.date ?? ''}`;
+      // ClinicalImpression rarely carries a SNOMED/LOINC code in our
+      // rules, so `display` is the practical differentiator between two
+      // assessments (e.g. "HTN assessment" vs "DM2 assessment") that
+      // happen to share a recorded date. Without it, two same-day rules
+      // produce CIs that codeKey can't distinguish and the merge silently
+      // collapses them to one row.
+      return `${base}|${n.fields.date ?? ''}|${n.fields.display ?? ''}`;
     }
     // MedicationRequest is now coded (RxNorm) — same disambiguator as
     // Observation/Condition: codeSystem + codeValue + status. Two

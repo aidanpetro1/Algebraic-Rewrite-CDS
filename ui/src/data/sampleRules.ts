@@ -113,7 +113,10 @@ const htnDm2Nodes: Node[] = [
   {
     id: 'assm', type: 'ClinicalImpression', x: 480, y: 360,
     legs: ['R'],
-    fields: { status: 'completed', date: '${now}' },
+    fields: {
+      status: 'completed', date: '${now}',
+      display: 'Comorbid HTN + DM2 assessment',
+    },
   },
 ];
 const htnDm2Edges: Edge[] = [
@@ -303,7 +306,10 @@ const htnNodes: Node[] = [
   {
     id: 'assm-htn', type: 'ClinicalImpression', x: 500, y: 200,
     legs: ['R'],
-    fields: { status: 'completed', date: '${now}' },
+    fields: {
+      status: 'completed', date: '${now}',
+      display: 'Hypertension assessment',
+    },
   },
 ];
 const htnEdges: Edge[] = [
@@ -356,7 +362,10 @@ const dm2Nodes: Node[] = [
   {
     id: 'assm-dm2', type: 'ClinicalImpression', x: 500, y: 200,
     legs: ['R'],
-    fields: { status: 'completed', date: '${now}' },
+    fields: {
+      status: 'completed', date: '${now}',
+      display: 'Diabetes mellitus type 2 assessment',
+    },
   },
 ];
 const dm2Edges: Edge[] = [
