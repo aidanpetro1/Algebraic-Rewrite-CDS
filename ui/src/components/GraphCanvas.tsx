@@ -702,6 +702,39 @@ export function GraphCanvas({
   const dimmedIds = legFilter
     ? new Set(nodes.filter((n) => !(n.legs ?? []).includes(legFilter)).map((n) => n.id))
     : null;
+
+  // Trim the END of the segment to the visible edge of the target node so
+  // the arrowhead marker doesn't land *inside* the target card (where it
+  // gets hidden under the card background). Approximate the target as an
+  // axis-aligned 220×140 box around its center — the actual cards vary
+  // slightly but this lines up cleanly enough that the arrow always sits
+  // just outside the border. We deliberately do NOT trim the start: it
+  // simplifies the geometry, and a line starting at the source center
+  // looks fine because the source card's background hides the segment
+  // inside it. Trimming both ends would risk the segment crossing itself
+  // when nodes get close together.
+  const NODE_HALF_W = 110;          // matches NODE_W=220 in layout.ts
+  const NODE_HALF_H = 50;           // slightly less than half-height so
+                                    // arrows clear the rounded corners.
+  const ARROW_PAD   = 6;            // distance from card border to arrow tip
+  const trimEnd = (
+    src: { x: number; y: number },
+    dst: { x: number; y: number },
+  ): { x: number; y: number } => {
+    const dx = src.x - dst.x;
+    const dy = src.y - dst.y;
+    const adx = Math.abs(dx);
+    const ady = Math.abs(dy);
+    if (adx === 0 && ady === 0) return dst;
+    // Parametric crossings of the box around dst, in units of the
+    // (src - dst) vector. Smaller t = closer to dst.
+    const tx = adx > 0 ? (NODE_HALF_W + ARROW_PAD) / adx : Infinity;
+    const ty = ady > 0 ? (NODE_HALF_H + ARROW_PAD) / ady : Infinity;
+    // Cap t at 1 — never extend past the source center.
+    const t = Math.min(tx, ty, 1);
+    return { x: dst.x + dx * t, y: dst.y + dy * t };
+  };
+
   const renderEdges = () =>
     edges.map((e, i) => {
       const a = posRef.current[e.from];
@@ -709,7 +742,11 @@ export function GraphCanvas({
       if (!a || !b) return null;
       const hl = !!selectedId && (e.from === selectedId || e.to === selectedId);
       const dim = !!dimmedIds && (dimmedIds.has(e.from) || dimmedIds.has(e.to));
-      const d = `M ${a.x} ${a.y} L ${b.x} ${b.y}`;
+      // Path starts at source center, ends at the target's border (with
+      // a small ARROW_PAD gap). The arrowhead — placed at the end — is
+      // now visible outside the target card.
+      const end = trimEnd(a, b);
+      const d = `M ${a.x} ${a.y} L ${end.x} ${end.y}`;
       return (
         <g key={i} className={dim ? 'edge-dim' : ''}>
           <path d={d} className={hl ? 'hl' : ''} markerEnd={hl ? 'url(#arrow-hl)' : 'url(#arrow)'} />
@@ -746,10 +783,14 @@ export function GraphCanvas({
         style={{ transform: `translate(${view.x}px, ${view.y}px) scale(${view.k})`, transformOrigin: '0 0' }}
       >
         <defs>
-          <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
-            <path d="M 0 0 L 10 5 L 0 10 z" fill="#c4c4c4" />
+          {/* refX=10 puts the tip at the path's end point (viewBox is 0-10).
+              Larger markerWidth/Height than before so the arrowhead reads
+              as an arrow, not a chevron, at default zoom. orient=auto so
+              the arrow rotates to match the segment direction. */}
+          <marker id="arrow" viewBox="0 0 10 10" refX="10" refY="5" markerWidth="10" markerHeight="10" orient="auto">
+            <path d="M 0 0 L 10 5 L 0 10 z" fill="#9aa0a6" />
           </marker>
-          <marker id="arrow-hl" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+          <marker id="arrow-hl" viewBox="0 0 10 10" refX="10" refY="5" markerWidth="11" markerHeight="11" orient="auto">
             <path d="M 0 0 L 10 5 L 0 10 z" fill="#4f46e5" />
           </marker>
         </defs>
