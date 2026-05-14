@@ -21,10 +21,29 @@ export interface AttrSpec {
   options?: string[];      // for enum-like string attrs (e.g. status values)
 }
 
+// Per-type status enums — codes the FHIR R4 spec defines for the
+// .status / .clinicalStatus / .intent slots on each resource. Listing
+// them here lets the structured editor render a status-aware select
+// instead of a free-text input, and keeps "Status" away from resources
+// that don't actually have a status concept.
 const OBSERVATION_STATUSES = ['registered', 'preliminary', 'final', 'amended', 'corrected', 'cancelled', 'entered-in-error', 'unknown'];
 const CONDITION_CLINICAL = ['active', 'recurrence', 'relapse', 'inactive', 'remission', 'resolved'];
 const IMPRESSION_STATUSES = ['preparation', 'in-progress', 'completed', 'entered-in-error'];
+const MEDREQ_STATUSES = ['active', 'on-hold', 'cancelled', 'completed', 'entered-in-error', 'stopped', 'draft', 'unknown'];
+const MEDREQ_INTENTS  = ['proposal', 'plan', 'order', 'original-order', 'reflex-order', 'filler-order', 'instance-order', 'option'];
+const APPT_STATUSES   = ['proposed', 'pending', 'booked', 'arrived', 'fulfilled', 'cancelled', 'noshow', 'entered-in-error', 'checked-in', 'waitlist'];
+const ENC_STATUSES    = ['planned', 'arrived', 'triaged', 'in-progress', 'onleave', 'finished', 'cancelled', 'entered-in-error', 'unknown'];
 
+// ATTRS_BY_TYPE is the source of truth for which predicate attributes
+// the structured builder offers per resource type. Adding an entry here
+// surfaces it in the attribute dropdown AND drives which value control
+// renders (numeric input vs. status select vs. date preset). Resource
+// types absent from this table show "(no attributes)" in the builder —
+// the user can still author raw FHIRPath via the "Custom…" template.
+//
+// Each row is a FHIR R4 path under the resource root. Paths match what
+// fhir_serialize.jl emits so a predicate authored against `start` for
+// an Appointment evaluates against the same field on the wire.
 export const ATTRS_BY_TYPE: Record<string, AttrSpec[]> = {
   Observation: [
     { path: 'valueQuantity.value', label: 'Value (numeric)',     type: 'numeric' },
@@ -32,12 +51,32 @@ export const ATTRS_BY_TYPE: Record<string, AttrSpec[]> = {
     { path: 'effectiveDateTime',   label: 'Effective time',      type: 'date'    },
   ],
   Condition: [
+    // Conditions don't carry a numeric value, so we only expose the
+    // status + date slots — the builder won't offer "Value (numeric)"
+    // for a Condition target.
     { path: 'clinicalStatus.coding.code', label: 'Clinical status', type: 'string', options: CONDITION_CLINICAL },
     { path: 'recordedDate',               label: 'Recorded date',   type: 'date'    },
   ],
   ClinicalImpression: [
     { path: 'status', label: 'Status', type: 'string', options: IMPRESSION_STATUSES },
     { path: 'date',   label: 'Date',   type: 'date'    },
+  ],
+  MedicationRequest: [
+    // No numeric, no date — MedicationRequest in our schema doesn't
+    // carry a structured authoredOn slot (fhir_serialize.jl omits it).
+    // If we ever add it, list it here as a 'date' attr.
+    { path: 'status', label: 'Status', type: 'string', options: MEDREQ_STATUSES },
+    { path: 'intent', label: 'Intent', type: 'string', options: MEDREQ_INTENTS  },
+  ],
+  Appointment: [
+    { path: 'status', label: 'Status', type: 'string', options: APPT_STATUSES },
+    { path: 'start',  label: 'Start',  type: 'date'   },
+    { path: 'end',    label: 'End',    type: 'date'   },
+  ],
+  Encounter: [
+    { path: 'status',       label: 'Status', type: 'string', options: ENC_STATUSES },
+    { path: 'period.start', label: 'Start',  type: 'date'   },
+    { path: 'period.end',   label: 'End',    type: 'date'   },
   ],
 };
 

@@ -36,14 +36,14 @@ const ts = Date.now();
 //  description; structurally we just require two readings.)
 // ============================================================
 const htnDm2Nodes: Node[] = [
-  // The three observation entries are tagged with N1 and N2 too — every
-  // L-pattern entry must appear in each NAC for the L→N morphism to be
-  // constructible. The NAC's "extra" entry (cond-htn for N1, cond-dm2
-  // for N2) extends the L pattern; the obs are the structural anchor
-  // shared between L and N.
+  // The three observation entries are only tagged L/K/R — every L-pattern
+  // entry must appear in each NAC for the L→N morphism to be constructible,
+  // but expandLegsForNACs (ruleBundle.ts) splices the N tags through at
+  // export time, so authoring only carries the "extra" forbidden-context
+  // entries (cond-htn for N1, cond-dm2 for N2) explicitly.
   {
     id: 'obs-bp1', type: 'Observation', x: 240, y: 180,
-    legs: ['L', 'K', 'R', 'N1', 'N2'],
+    legs: ['L', 'K', 'R'],
     fields: {
       codeSystem: 'http://loinc.org', codeValue: '8480-6',
       codeDisplay: 'Systolic blood pressure',
@@ -52,7 +52,7 @@ const htnDm2Nodes: Node[] = [
   },
   {
     id: 'obs-bp2', type: 'Observation', x: 240, y: 380,
-    legs: ['L', 'K', 'R', 'N1', 'N2'],
+    legs: ['L', 'K', 'R'],
     fields: {
       codeSystem: 'http://loinc.org', codeValue: '8480-6',
       codeDisplay: 'Systolic blood pressure',
@@ -61,7 +61,7 @@ const htnDm2Nodes: Node[] = [
   },
   {
     id: 'obs-a1c', type: 'Observation', x: 240, y: 580,
-    legs: ['L', 'K', 'R', 'N1', 'N2'],
+    legs: ['L', 'K', 'R'],
     fields: {
       codeSystem: 'http://loinc.org', codeValue: '4548-4',
       codeDisplay: 'Hemoglobin A1c',
@@ -152,7 +152,7 @@ const htnDm2Predicates: Predicate[] = [
 const metforminNodes: Node[] = [
   {
     id: 'cond-dm2', type: 'Condition', x: 240, y: 360,
-    legs: ['L', 'K', 'R', 'N1'],
+    legs: ['L', 'K', 'R'],
     fields: {
       codeSystem: 'http://snomed.info/sct', codeValue: '44054006',
       codeDisplay: 'Type 2 diabetes mellitus',
@@ -207,7 +207,7 @@ const metforminPredicates: Predicate[] = [];
 const ophthRefNodes: Node[] = [
   {
     id: 'cond-dm2', type: 'Condition', x: 240, y: 360,
-    legs: ['L', 'K', 'R', 'N1'],
+    legs: ['L', 'K', 'R'],
     fields: {
       codeSystem: 'http://snomed.info/sct', codeValue: '44054006',
       codeDisplay: 'Type 2 diabetes mellitus',
@@ -269,7 +269,7 @@ const ophthRefPredicates: Predicate[] = [
 const htnNodes: Node[] = [
   {
     id: 'obs-bp', type: 'Observation', x: 280, y: 380,
-    legs: ['L', 'K', 'R', 'N1'],
+    legs: ['L', 'K', 'R'],
     fields: {
       codeSystem: 'http://loinc.org', codeValue: '8480-6',
       codeDisplay: 'Systolic blood pressure',
@@ -327,7 +327,7 @@ const htnPredicates: Predicate[] = [
 const dm2Nodes: Node[] = [
   {
     id: 'obs-a1c', type: 'Observation', x: 280, y: 380,
-    legs: ['L', 'K', 'R', 'N1'],
+    legs: ['L', 'K', 'R'],
     fields: {
       codeSystem: 'http://loinc.org', codeValue: '4548-4',
       codeDisplay: 'Hemoglobin A1c',

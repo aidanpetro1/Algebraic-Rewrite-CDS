@@ -40,20 +40,42 @@ const fullUrlFor = (id: string): string => `urn:uuid:${id}`;
 // in every NAC is a UX wart, so the UI lets them tag only the *extra*
 // forbidden context. At export time we splice the L tags through:
 // for every NAC index `Ni` in use, every L-tagged node gets `Ni` added.
+//
+// A NAC is "meaningful" only when it contains at least one node that
+// is NOT already in L — i.e. the user has actually authored some extra
+// forbidden context. A NAC whose only content is L is degenerate: the
+// engine's L→N morphism becomes an iso, every L-match trivially extends,
+// and `extension_exists` returns true unconditionally. The rule would
+// then never fire (cds_rule.jl::_find_valid_match returns :nac_violated
+// for any match). So before extending, we filter NACs down to the
+// meaningful ones, and strip any stray non-meaningful NAC tags off
+// every node — this lets a user who has only authored L+R (or who has
+// accidentally tagged an L node with N1 without filling that NAC in)
+// still get a working rule.
 function expandLegsForNACs(nodes: Node[]): Node[] {
-  const nacs = new Set<string>();
+  // A NAC index is "meaningful" iff at least one node in it is NOT in L.
+  const meaningfulNacs = new Set<string>();
   for (const n of nodes) {
-    for (const leg of n.legs ?? []) {
-      if (leg.startsWith('N')) nacs.add(leg);
+    const legs = n.legs ?? [];
+    if (legs.includes('L')) continue;
+    for (const leg of legs) {
+      if (leg.startsWith('N')) meaningfulNacs.add(leg);
     }
   }
-  if (nacs.size === 0) return nodes;
+  // Strip non-meaningful NAC tags from every node (these would otherwise
+  // materialize a degenerate engine-level NAC). Then auto-extend L
+  // nodes into the remaining meaningful NACs.
   return nodes.map((n) => {
     const legs = n.legs ?? [];
-    if (!legs.includes('L')) return n;
-    // Add any NAC tags that aren't already present.
-    const expanded = [...legs];
-    for (const nac of nacs) {
+    if (legs.length === 0) return n;
+    const kept = legs.filter((l) =>
+      !l.startsWith('N') || meaningfulNacs.has(l),
+    );
+    if (!kept.includes('L') || meaningfulNacs.size === 0) {
+      return kept.length === legs.length ? n : { ...n, legs: kept };
+    }
+    const expanded = [...kept];
+    for (const nac of meaningfulNacs) {
       if (!expanded.includes(nac)) expanded.push(nac);
     }
     return { ...n, legs: expanded };

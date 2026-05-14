@@ -384,10 +384,16 @@ export function DetailPanel({
                   })}
                 </div>
                 {/* NAC tags are only meaningful on nodes that AREN'T in
-                    L. L-tagged nodes get auto-extended into every NAC
+                    L. L-tagged nodes get auto-extended into every
+                    *meaningful* NAC (one with at least one non-L node)
                     by expandLegsForNACs at bundle-build time, so showing
                     NAC toggles on them would mislead the author into
                     thinking they have to manage NAC membership manually.
+                    A NAC with only L-tagged nodes is degenerate (engine
+                    NAC morphism becomes an iso, blocks every fire), so
+                    expandLegsForNACs also strips those stray N tags —
+                    meaning the user can leave an L node accidentally
+                    tagged with N1 and the rule still fires correctly.
                     Hide the row entirely when L is set; show it (with
                     "+ NAC" affordance) when the node is NAC-only or
                     R-only material. */}
@@ -531,8 +537,23 @@ export function DetailPanel({
                                 <option key={o} value={o}>{o}</option>
                               ))}
                             </select>
-                            {p.operator !== 'exists' && (
-                              spec?.options ? (
+                            {/* Value input — gated on operator (no value for
+                                'exists') AND on having a recognized spec
+                                (a stale attribute outside ATTRS_BY_TYPE
+                                wouldn't know which control to render, so
+                                rather than guessing with a text box we
+                                hide the value entirely and let the user
+                                pick a valid attribute first).
+                                Exactly one of three controls renders,
+                                keyed off spec.type / spec.options:
+                                  - enum (status, intent, etc.)  → select
+                                  - date                          → preset
+                                  - numeric                       → number input
+                                Free-form strings (spec without options)
+                                fall through to a text input — rare in
+                                clinical predicates but supported. */}
+                            {p.operator !== 'exists' && spec && (
+                              spec.options ? (
                                 <select
                                   className="select pred-ctl"
                                   value={p.value}
@@ -542,15 +563,13 @@ export function DetailPanel({
                                     <option key={o} value={o}>{o}</option>
                                   ))}
                                 </select>
-                              ) : spec?.type === 'date' ? (
+                              ) : spec.type === 'date' ? (
                                 // Date attributes: relative-range preset
                                 // dropdown ("last 7 days", "last 3 months",
                                 // etc). Absolute datetime is rare in
                                 // clinical predicates — when authors need
                                 // it they switch the predicate to raw
-                                // FHIRPath via the toggle below. Keeping
-                                // the row to a single control reduces the
-                                // perceived clutter on date predicates.
+                                // FHIRPath via the toggle below.
                                 <select
                                   className="select pred-ctl"
                                   value={DATE_PRESETS.some((d) => d.value === p.value) ? p.value : 'now-365d'}
@@ -560,12 +579,20 @@ export function DetailPanel({
                                     <option key={d.value} value={d.value}>{d.label}</option>
                                   ))}
                                 </select>
+                              ) : spec.type === 'numeric' ? (
+                                <input
+                                  className="input pred-ctl"
+                                  type="number"
+                                  step="any"
+                                  placeholder="0.0"
+                                  value={p.value}
+                                  onChange={(e) => setStructured({ value: e.target.value })}
+                                />
                               ) : (
                                 <input
                                   className="input pred-ctl"
-                                  type={spec?.type === 'numeric' ? 'number' : 'text'}
-                                  step={spec?.type === 'numeric' ? 'any' : undefined}
-                                  placeholder={spec?.type === 'numeric' ? '0.0' : 'value'}
+                                  type="text"
+                                  placeholder="value"
                                   value={p.value}
                                   onChange={(e) => setStructured({ value: e.target.value })}
                                 />

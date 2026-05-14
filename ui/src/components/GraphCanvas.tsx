@@ -972,12 +972,16 @@ export function GraphCanvas({
               </div>
               {showLegs && (legs.length > 0 || (predicateCounts[n.id] ?? 0) > 0) && (
                 <div className="node-legs">
-                  {/* If a node is in L, every NAC implicitly extends to
-                      include it (expandLegsForNACs in the bundle
-                      builder). Showing N1/N2 chips alongside L is
-                      redundant noise — suppress them visually so the
-                      canvas reads as L/K/R-focused for matching nodes,
-                      and N-only for NAC-extra nodes. */}
+                  {/* If a node is in L, every meaningful NAC implicitly
+                      extends to include it (expandLegsForNACs in the
+                      bundle builder; a NAC is "meaningful" iff it has
+                      at least one non-L node). Showing N1/N2 chips
+                      alongside L is redundant noise — suppress them
+                      visually so the canvas reads as L/K/R-focused for
+                      matching nodes, and N-only for NAC-extra nodes.
+                      Stray N tags on L nodes (no extra content in that
+                      NAC) get stripped at export so a half-authored
+                      NAC doesn't block the rule. */}
                   {(() => {
                     const inL = legs.includes('L');
                     const visibleLegs = inL

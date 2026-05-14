@@ -102,8 +102,9 @@ export function validateRule(rule: SavedRule): RuleIssue[] {
 
   // ---- NAC structural checks --------------------------------------------
   // Each NAC's "extra" content (rows in N \ image(L)) is what makes the
-  // NAC interesting. If a NAC has zero extras (i.e., it's exactly L), it
-  // matches whenever L matches — which means the rule never fires.
+  // NAC interesting. If a NAC has zero extras (i.e., it's exactly L),
+  // expandLegsForNACs drops it at export time so the rule still fires —
+  // but the author probably meant to add something to it, so we warn.
   const nacIds = Array.from(new Set(nodes.flatMap((n) => Array.from(legSet(n).nacs))));
   const lIds = new Set(lNodes.map((n) => n.id));
   for (const nacId of nacIds) {
@@ -112,7 +113,7 @@ export function validateRule(rule: SavedRule): RuleIssue[] {
     if (extras.length === 0) {
       issues.push({
         severity: 'warning',
-        message: `${nacId} has no nodes outside L — it'll match whenever L matches, blocking the rule from ever firing. Add at least one ${nacId}-only node that represents the forbidden context.`,
+        message: `${nacId} has no nodes outside L — it's empty and will be dropped at export so the rule still fires. Add at least one ${nacId}-only node to express the forbidden context.`,
       });
     }
   }

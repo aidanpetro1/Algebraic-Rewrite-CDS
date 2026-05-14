@@ -30,7 +30,11 @@ export interface RuleTemplate {
 // 1. Add diagnosis from observation
 //    L  = Observation (preserved)
 //    R  = + Condition + ClinicalImpression linking them
-//    N1 = the diagnosis Condition (forbidden as pre-existing)
+//    N1 = the diagnosis Condition (forbidden as pre-existing).
+//         Only the "extra" forbidden-context node carries the N1 tag;
+//         L nodes get auto-extended into every meaningful NAC at export
+//         (see expandLegsForNACs in ruleBundle.ts), so we no longer tag
+//         the L pattern explicitly.
 //    Predicate: Observation.valueQuantity.value OP threshold
 // ============================================================
 const addDiagnosis: Pick<RuleTemplate, 'nodes' | 'edges' | 'predicates' | 'defaultSelectedId'> = {
@@ -39,7 +43,7 @@ const addDiagnosis: Pick<RuleTemplate, 'nodes' | 'edges' | 'predicates' | 'defau
       id: 'obs',
       type: 'Observation',
       x: 280, y: 420,
-      legs: ['L', 'K', 'R', 'N1'],
+      legs: ['L', 'K', 'R'],
       fields: {
         codeSystem:  '',
         codeValue:   '',
@@ -94,10 +98,11 @@ const addDiagnosis: Pick<RuleTemplate, 'nodes' | 'edges' | 'predicates' | 'defau
 // 2. Add medication for an existing condition
 //    L  = Condition (preserved)
 //    R  = + MedicationRequest tied to that Condition
-//    N1 = the same MedicationRequest (forbidden as pre-existing)
-//    Note: MedicationRequest isn't in the Julia engine schema yet, so
-//    firing this template through the engine is a no-op for the new
-//    resource — but the UI authors it correctly and exports it cleanly.
+//    N1 = the same MedicationRequest (forbidden as pre-existing). Only
+//         the new MedicationRequest carries the N1 tag — the L pattern
+//         gets auto-extended at export time.
+//    Note: MedicationRequest IS in the engine schema now; firing this
+//    template lands a real MedicationRequest in patient state.
 // ============================================================
 const addMedication: Pick<RuleTemplate, 'nodes' | 'edges' | 'predicates' | 'defaultSelectedId'> = {
   nodes: [
@@ -105,7 +110,7 @@ const addMedication: Pick<RuleTemplate, 'nodes' | 'edges' | 'predicates' | 'defa
       id: 'cond',
       type: 'Condition',
       x: 280, y: 380,
-      legs: ['L', 'K', 'R', 'N1'],
+      legs: ['L', 'K', 'R'],
       fields: {
         codeSystem:     '',
         codeValue:      '',

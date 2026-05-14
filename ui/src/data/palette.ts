@@ -173,7 +173,9 @@ export const INITIAL_EDGES: Edge[] = [
 //   Predicate: Observation.valueQuantity.value >= 6.5
 //
 // In the UI this is three nodes:
-//   * obs-hba1c   tagged L+K+R+N1   (preserved everywhere, including NAC)
+//   * obs-hba1c   tagged L+K+R       (auto-extended into N1 at export by
+//                                     expandLegsForNACs, since N1 has at
+//                                     least one non-L node — cond-dm2)
 //   * cond-dm2    tagged R+N1        (created by the rule, forbidden in NAC)
 //   * assm-dm2    tagged R           (created by the rule)
 //
@@ -188,7 +190,7 @@ export const INITIAL_RULE_NODES: Node[] = [
     id: 'obs-hba1c',
     type: 'Observation',
     x: 300, y: 420,
-    legs: ['L', 'K', 'R', 'N1'],
+    legs: ['L', 'K', 'R'],
     fields: {
       codeSystem:  'http://loinc.org',
       codeValue:   '4548-4',
@@ -238,6 +240,7 @@ export const INITIAL_RULE_PREDICATES: Predicate[] = [
     fhirpath: "Observation.code.coding.where(system='http://loinc.org' and code='4548-4').exists() and Observation.valueQuantity.value >= 6.5",
     label: 'HbA1c ≥ 6.5',
     // Structured form so the seed predicate opens in builder mode by default.
+    // (rewritten to force mount-cache refresh)
     attribute: 'valueQuantity.value',
     operator: '>=',
     value: '6.5',
