@@ -43,6 +43,11 @@ const REFERENCE_LABELS: Record<string, Record<string, string[]>> = {
     Patient:      ['participant'],
     Practitioner: ['participant'],
     Location:     ['participant'],
+    // Junction label for the engine's `ApptBasedOn` Hom. FHIR R4 R strictly
+    // types Appointment.basedOn as ServiceRequest|CarePlan, but the
+    // engine schema also accepts Condition (clinical_state_multi.jl:59-61)
+    // so referrals can be authored as basedOn the diagnosis they motivate.
+    Condition:    ['basedOn'],
   },
   Encounter: {
     Patient:      ['subject'],

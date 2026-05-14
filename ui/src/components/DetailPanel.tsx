@@ -115,6 +115,27 @@ export function DetailPanel({
     if (node.type === 'ClinicalImpression' && key === 'status') {
       return { closed: true, options: ['preparation', 'in-progress', 'completed', 'entered-in-error'] };
     }
+    // Cross-resource harmonization: every resource whose schema carries
+    // a coded status field should get the same dropdown treatment, not
+    // a free-text input. Otherwise editing a MedicationRequest feels
+    // qualitatively different from editing a Condition even though both
+    // are coded clinical resources. FHIR R4 valuesets, abbreviated to
+    // the codes the engine actually exercises.
+    if (node.type === 'MedicationRequest' && key === 'status') {
+      return { closed: true, options: ['active', 'on-hold', 'cancelled', 'completed', 'entered-in-error', 'stopped', 'draft', 'unknown'] };
+    }
+    if (node.type === 'MedicationRequest' && key === 'intent') {
+      return { closed: true, options: ['proposal', 'plan', 'order', 'original-order', 'reflex-order', 'filler-order', 'instance-order', 'option'] };
+    }
+    if (node.type === 'Appointment' && key === 'status') {
+      return { closed: true, options: ['proposed', 'pending', 'booked', 'arrived', 'fulfilled', 'cancelled', 'noshow', 'entered-in-error', 'checked-in', 'waitlist'] };
+    }
+    if (node.type === 'Encounter' && key === 'status') {
+      return { closed: true, options: ['planned', 'arrived', 'triaged', 'in-progress', 'onleave', 'finished', 'cancelled', 'entered-in-error', 'unknown'] };
+    }
+    if (node.type === 'Encounter' && key === 'class') {
+      return { closed: true, options: ['ambulatory', 'emergency', 'home', 'inpatient', 'observation', 'virtual', 'short-stay', 'field'] };
+    }
     if (key === 'gender' && node.type === 'Patient') {
       return { closed: true, options: ['male', 'female', 'other', 'unknown'] };
     }
