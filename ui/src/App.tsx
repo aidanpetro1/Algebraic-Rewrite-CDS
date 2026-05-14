@@ -208,7 +208,10 @@ export function App() {
   //   v14 → v15: rule CIs gained a `display` field for merge disambiguation.
   //   v15 → v16: reverted display fields; identity is now morphism-based
   //              (linked-problem / linked-finding edges in codeKey).
-  const LS_KEY = 'algebraic_cds_rules_v16';
+  //   v16 → v17: dropped redundant N1/N2 tags from L-tagged sample-rule
+  //              nodes; expandLegsForNACs now auto-extends only into
+  //              "meaningful" NACs (those with at least one non-L node).
+  const LS_KEY = 'algebraic_cds_rules_v17';
   const [savedRules, setSavedRules] = useState<SavedRule[]>(() => {
     try {
       const raw = localStorage.getItem(LS_KEY);
