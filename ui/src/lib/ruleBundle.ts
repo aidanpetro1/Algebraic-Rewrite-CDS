@@ -180,6 +180,24 @@ function autoFreeDisplay(field: string, value: string, n: Node): string {
   return `\${_auto_${safeId}_${field}}`;
 }
 
+// Sibling of autoFreeDisplay for non-display primitives (clinicalStatus,
+// recordedDate, etc.). The difference: this only auto-templates *blank*
+// values, leaving non-empty literals alone. A user who typed
+// `clinicalStatus: 'active'` is explicitly constraining the match to
+// active Conditions — we must not silently wildcard that. But a blank
+// field on a matching leg has no useful interpretation as a literal:
+// it would become `""` (or `DateTime(0)` for time slots) on the engine
+// side and could never match a real host Condition. Auto-AttrVar is the
+// only sensible reading. R-only material stays literal so newly
+// materialized resources keep concrete attribute values.
+function freeIfBlank(field: string, value: string, n: Node): string {
+  if (!isMatchingLeg(n.legs)) return value;
+  if (templateName(value) !== null) return value;   // already templated
+  if (value !== '') return value;                    // literal — keep it
+  const safeId = n.id.replace(/[^a-zA-Z0-9]/g, '_');
+  return `\${_auto_${safeId}_${field}}`;
+}
+
 // Outgoing edges from a source node, applied to the resource being built
 // as FHIR reference fields. Edge label becomes the field name, target
 // becomes a Reference. Junction labels (`finding`, `problem`) are
@@ -278,8 +296,16 @@ function buildCondition(n: Node, edges: Edge[]): Record<string, unknown> {
   // clinicalStatus is a CodeableConcept whose .coding[0].code is what
   // fhir_parse.jl reads. We only emit the code (no system) to match the
   // shape produced by fhir_serialize.jl.
-  if (f.clinicalStatus) {
-    const cs = templateName(f.clinicalStatus);
+  //
+  // freeIfBlank wildcards a blank status on matching legs — without it,
+  // an L Condition with no clinicalStatus would become a literal "" on
+  // the engine side and fail to homomorphism into any real host
+  // Condition (which always carries a non-empty status like "active").
+  // Non-empty literals are preserved (the user is explicitly matching on
+  // that status), and explicit ${var} templates pass through.
+  const clinStatus = freeIfBlank('clinicalStatus', f.clinicalStatus ?? '', n);
+  if (clinStatus) {
+    const cs = templateName(clinStatus);
     if (cs !== null) {
       // template-variable status — emit as a {coding:[{_code: …}]}
       out.clinicalStatus = {
@@ -292,13 +318,17 @@ function buildCondition(n: Node, edges: Edge[]): Record<string, unknown> {
       out.clinicalStatus = {
         coding: [{
           system: 'http://terminology.hl7.org/CodeSystem/condition-clinical',
-          code:   f.clinicalStatus,
+          code:   clinStatus,
         }],
       };
     }
   }
 
-  Object.assign(out, primitiveOrTemplate('recordedDate', f.recordedDate ?? '', asString));
+  // recordedDate: same blank-→-wildcard treatment. Otherwise a blank
+  // date in L collapses to DateTime(0) on the engine side, which never
+  // equals a real host recordedDate.
+  Object.assign(out, primitiveOrTemplate(
+    'recordedDate', freeIfBlank('recordedDate', f.recordedDate ?? '', n), asString));
 
   // Outgoing edges (subject, encounter, asserter, …) → reference fields.
   applyOutgoingRefs(out, n, edges);

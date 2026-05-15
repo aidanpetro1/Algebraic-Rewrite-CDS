@@ -67,6 +67,35 @@ export function DetailPanel({
     onUpdateNode(node.id, { fields: next });
   };
 
+  // Drop a field from this node's fields map entirely. Distinct from
+  // setField(k, '') — a blank value is still a present-but-empty field
+  // and the bundle builder may emit it as an empty literal; deleting
+  // removes it from the wire shape entirely, letting the consuming
+  // parser fall back to its sentinel default.
+  const deleteField = (k: string) => {
+    const next: FieldMap = { ...node.fields };
+    delete next[k];
+    onUpdateNode(node.id, { fields: next });
+  };
+
+  // FHIR R4 required fields (cardinality 1..* or 1..1) per resource
+  // type. These can't be deleted from the Fields tab — removing them
+  // would produce an invalid resource. Cardinality 1..1 fields modeled
+  // as outgoing references (subject, participant, ...) live as edges,
+  // not fields, so they aren't in this map. The code triple's identity
+  // pair (codeSystem, codeValue) is treated as required wherever the
+  // parent resource's `code` slot is required by FHIR.
+  const REQUIRED_FIELDS: Record<string, Set<string>> = {
+    Observation:        new Set(['status', 'codeSystem', 'codeValue']),
+    Condition:          new Set(['codeSystem', 'codeValue']),
+    ClinicalImpression: new Set(['status']),
+    MedicationRequest:  new Set(['status', 'intent', 'codeSystem', 'codeValue']),
+    Appointment:        new Set(['status']),
+    Encounter:          new Set(['status', 'class']),
+  };
+  const isRequiredField = (k: string): boolean =>
+    REQUIRED_FIELDS[node.type]?.has(k) ?? false;
+
   // Apply a code-library entry to (codeSystem, codeValue, codeDisplay) atomically.
   // Used by the code-picker autocomplete on the codeDisplay row, so the
   // user types a name and gets the proper FHIR triple in one click.
@@ -158,6 +187,25 @@ export function DetailPanel({
     return undefined;
   };
 
+  // Per-row delete affordance. Omitted entirely for FHIR-required
+  // fields so users can't put the resource into an invalid state from
+  // the UI. The button is a sibling of the input inside `.field-row`;
+  // styling rides on the existing `.btn.icon.ghost.sm` chrome.
+  const renderDeleteFieldButton = (k: string) => {
+    if (isRequiredField(k)) return null;
+    return (
+      <button
+        className="btn icon ghost sm"
+        title="Remove this field"
+        aria-label={`Remove ${k}`}
+        style={{ marginLeft: 4 }}
+        onClick={() => deleteField(k)}
+      >
+        ✕
+      </button>
+    );
+  };
+
   // One row per field — picks between <select> (closed enum), <input list>
   // combobox (open enum), and <input> (no enum) based on fieldOptionsFor.
   const renderFieldRow = (k: string, v: string) => {
@@ -209,6 +257,7 @@ export function DetailPanel({
               </div>
             )}
           </div>
+          {renderDeleteFieldButton(k)}
         </div>
       );
     }
@@ -225,6 +274,7 @@ export function DetailPanel({
             {!inSet && <option value={v}>{v ? `${v} (custom)` : '(none)'}</option>}
             {opts.options.map((o) => <option key={o} value={o}>{o}</option>)}
           </select>
+          {renderDeleteFieldButton(k)}
         </div>
       );
     }
@@ -245,6 +295,7 @@ export function DetailPanel({
             {opts.options.map((o) => <option key={o} value={o} />)}
           </datalist>
         )}
+        {renderDeleteFieldButton(k)}
       </div>
     );
   };
